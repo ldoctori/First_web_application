@@ -1,12 +1,18 @@
 package edu.school21.cinema.repositoties;
 
 import com.sun.xml.internal.bind.v2.model.core.ID;
+import com.zaxxer.hikari.HikariDataSource;
 import edu.school21.cinema.models.User;
+import edu.school21.cinema.servlets.MainPage;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
-import javax.sql.DataSource;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.util.List;
 import java.util.Optional;
 
 @Component
@@ -16,15 +22,47 @@ public class UsersRepositoryImpl implements UsersRepository{
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
-    public void setJdbcTemplate(DataSource dataSource) {
-        this.jdbcTemplate = new JdbcTemplate(dataSource);
+    public void setJdbcTemplate(HikariDataSource hikariDataSource) {
+        this.jdbcTemplate = new JdbcTemplate(hikariDataSource);
     }
 
+    @Override
+    public Optional<List<User>> findByEmail(String emailOrFirstName) {
+        Optional optional = Optional.ofNullable(this.jdbcTemplate.query("SELECT * FROM users WHERE email=?",
+                new Object[]{emailOrFirstName}, (rs, rowNum) ->
+                        new User(rs.getString("first_name"),
+                                rs.getString("last_name"),
+                                rs.getString("phone"),
+                                rs.getString("password"),
+                                rs.getString("email"),
+                                rs.getLong("id"))));
+            return optional;
+    }
+
+    @Override
+    public void createUsersTable() throws IOException {
+
+        InputStream inputStream = MainPage.class.getResourceAsStream("/sql/schema.sql");
+        BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(inputStream));
+        String line = bufferedReader.readLine();
+        String sqlSchema = "";
+        while (line != null) {
+            sqlSchema += line;
+            line = bufferedReader.readLine();
+        }
+        jdbcTemplate.update(sqlSchema, new Object[]{});
+    }
 
     @Override
     public <S extends User> S save(S entity) {
 
-        jdbcTemplate.update("INSERT INTO users (name, password) VALUES ('" + entity.getFirstName() + "', '" + entity.getPassword() + "')", new Object[]{});
+        jdbcTemplate.update("INSERT INTO users (first_name, last_name, email, phone, password)"
+                + " VALUES ('" + entity.getFirstName()
+                                + "', '" + entity.getLastName()
+                                + "', '" + entity.getEmail()
+                                + "', '" + entity.getPhoneNumber()
+                                + "', '" + entity.getPassword()
+                                + "')", new Object[]{});
         return entity;
     }
 
